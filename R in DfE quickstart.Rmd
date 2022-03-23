@@ -1,0 +1,211 @@
+---
+title: "R in the Department for Education"
+#author: "by Owen Churches"
+#date: "28/02/2022"
+output: 
+  word_document:
+    reference_docx: education-plain-A4-template.docx
+    toc: true
+---
+
+\newpage
+
+## A quick introduction to R and how the Department can use it
+### Background
+The R programming language is a data analysis and visualization tool. It can be used to build complete pipelines for data extraction, cleaning, statistical model building, visualisation and web hosting. Because R is opensource is is free to be used and extended by individuals and organisations.
+
+### Reasons to use R
+
+#### Scripting not clicking
+R is a scripted programming language much like SQL but with capabilities that extend beyond extracting and summarizing data. Hence, using R is more efficient that using Excel or PowerBI becuase updating the analysis with new data or aesthetics only requires changing code and not repeadedly pointing and clicking.
+
+#### Extensible software
+R is opensource, unlike Excel and PowerBI which are proprietary. One of the advantages of being opensource is that R is entirely extensible. If there is functionality that we need, we can build it in R. Many R users have already done this and extended the functionality of R into fields such as text mining, machine learning, network analysis and GIS.
+
+#### A committed community
+If we wish to be innovative in our use of data then we will frequently reach the limits of our knowledge. Hence, it is helpful to have a large and friendly user base who can answer questions (or who have already answered them because we are not the first person to have this problem).
+
+The R user community has gone out of its way to be approachable and welcoming taking active steps to promote historically underrepresented groups^[https://rladies.org/, https://forwards.github.io/]. There is also an active community answering R related questions on [stackoverflow](https://stackoverflow.com/questions/tagged/r). This means that fixing problems or learning new skills is frequently as easy as searching stackoverflow and finding a situation where another user has had the same problem.
+
+### An example
+
+As an example of how this works, we might consider answering the question:
+
+*"What are the largest eight schools by current maximum capacity?"*
+
+A full pipeline for an answer in R that would take multiple other programs is:
+
+```{r fig.width=7, fig.height=3, message=FALSE, warning=FALSE}
+library(DBI)
+library(tidyverse)
+con <- dbConnect(odbc::odbc(), "DRADBPROD", timeout = 10)
+
+dfe_colours <- dbGetQuery(con, 
+  "SELECT  DISTINCT
+  [AAL_BG_Colour]
+  FROM [BI].[rel].[Assessment_Achievement_Level]") %>%
+  pull(AAL_BG_Colour)
+
+biggest_schools <- dbGetQuery(con, 
+                  "SELECT TOP 8 
+                  Site_ID, Site_Name, Site_Type, Longitude, Latitude, Current_Maximum_Student_Capacity 
+                  FROM bi.dwh.dim_site
+                  WHERE IsOperational = 'TRUE'
+                  AND Site_Type IN ('Primary Education', 'Secondary Education', 'Primary/Secondary Combined') 
+                  ORDER BY Current_Maximum_Student_Capacity DESC")
+
+biggest_schools %>%
+  ggplot(aes(Current_Maximum_Student_Capacity, 
+             reorder(Site_Name, Current_Maximum_Student_Capacity), 
+             fill = Site_Type)) + 
+  geom_col() + 
+  scale_fill_manual(values = c("Primary/Secondary Combined" = dfe_colours[2], 
+                               "Secondary Education" = dfe_colours[3])) +
+  theme_minimal() +
+  theme(legend.position = "bottom") + 
+  labs(title = "SA schools with the highest capacity", 
+       y = "", x = "", fill = "")
+
+```
+
+
+### How to proceed?
+If we wish to proceed with using R more broadly across the Department we could consider a multi-level integration with:
+
+* Introductory level
+
+    * A *learnR group* for people starting to use R for the first time (including people with no background in programming). This could be a group that meet in person or via Teams each week for 30 minutes and worked through the [R for Data Science](https://r4ds.had.co.nz/) book. The group would be encouraged to self support but would also include an experienced R user who could answer questions and keep motivation high by providing real Education related questions.
+
+    * A series of videos and a code repository explaining some frequently encountered processes in R much like has already been created for SQL within DRA.
+
+* Intermediate level
+    * A *TidyTuesday group* for people with some R experience who would like to use a "play pen" before handling mission critical analyses. The group could meet on a Tuesday and analyse the most recent data set from the [TidyTuesday](https://github.com/rfordatascience/tidytuesday) collaborative.
+    * A wiki of questions and answers about using R with DfE data including accessing the databases, colour schemes and document templates.
+
+* Advanced level
+    * *Focused extension workshops* on topics that different staff have particular R skills in such as machine learning, text mining or GIS.
+    * An *infrastructure* group who build and deploy a package of functions that are useful for staff in the Department including colour scheme standards, office stationary and data access examples.
+
+### Coda
+This document is an example of the change it seeks to be. It was written entirely in R. If, in the future the Department stationary changes or the underlying data is updated then the document can be re-generated from its source. All the formatting (including the code chunks) was generated automatically from the Word document template.
+
+\newpage
+
+## Quickstart
+The following can be done *without* admin rights to your computer.
+
+### Get the software
+There are two pieces of software needed to use R efficiently: R and RStudio. R is the software that does all the calculating and RStudio is the nice interface through which we use R.
+
+#### Download R
+Go to: https://cran.r-project.org/bin/windows/base/ and click on "Download R *.*.* for Windows" (where * are numbers) at the top of the page. Follow the prompts along the way. You won't be able to install the software unless you already have admin rights but that's OK for now.
+![how to install R](img_r.png)
+
+#### Download RStudio
+Go to: https://www.rstudio.com/products/rstudio/download/#download and click on "Download RStudio for Windows". Again, follow the prompts along the way. You won't be able to install the software unless you already have admin rights but that's ok for now.
+![how to install RStudio](img_rstudio.png)
+
+
+#### Ask IT to install R and RStudio
+Go to: https://selfservice.education.sa.gov.au/edit/ and click on "Order something", "Software", "Other" then "Non-standard Software". Fill in the form asking for R and RStudio to be installed.
+
+### Get to work
+You've just installed two pieces of software but from now on you'll only interact directly with one: RStudio. So, open RStudio...
+
+#### What you see in RStudio
+
+![](img_rstudio_loaded.png)
+
+There are four panels. In the bottom-left is a blinking cursor. If you type in a mathematical string you will get an answer. Give it a try:
+
+```{r}
+1 + 1
+```
+
+#### Get the data
+
+##### Define a DSN
+
+Opening Microsoft SQL Server Management Studio to extract and save data then opening RStudio to analyse it is an inefficient process and makes it harder to keep the documentation of what we did up to date. It makes everything more efficient if we access the databases from within RStudio.
+
+The way to set this up that I used is:
+
+Click the Windows "Start" button and open "Control Panel." Search for and click on "Administrative Tools" in the list of utilities. Double-click the icon labeled "ODBC Data Sources (64 bit)." Click on the "User DSN" tab and click add. Set the Driver = ODBC Driver 17 for SQL Server and the Server = DRADBPROD. Give it the name and description DRADBPROD (actually you can call it anything you want but it will help if we all call it the same thing then our code will be consistent. Tick that you want it with active directory authentication.
+
+##### Establish a connection in RStudio
+
+Back in RStudio need a few packages:
+
+`install.packages("DBI")`
+
+`install.packages("odbc")`
+
+`install.packages("tidyverse")`
+
+Then you can set up a blank R chunk in an RMarkdown document and write:
+
+```{r}
+con <- dbConnect(odbc::odbc(), "DRADBPROD", timeout = 10)
+```
+
+Using that connection called `con`, there are two main ways of getting the data into R:
+
+##### Write everying in R
+
+```{r}
+dfe_colours <- dbGetQuery(con, 
+  "SELECT  DISTINCT
+  [AAL_BG_Colour]
+  FROM [BI].[rel].[Assessment_Achievement_Level]") %>%
+  pull(AAL_BG_Colour)
+
+biggest_schools <- dbGetQuery(con, 
+                  "SELECT TOP 8 
+                  Site_ID, Site_Name, Site_Type, Longitude, Latitude, Current_Maximum_Student_Capacity 
+                  FROM bi.dwh.dim_site
+                  WHERE IsOperational = 'TRUE'
+                  AND Site_Type IN ('Primary Education', 'Secondary Education', 'Primary/Secondary Combined') 
+                  ORDER BY Current_Maximum_Student_Capacity DESC")
+```
+
+The bit inside the quote marks after `dbGetQuery(con,` is really just SQL. But if you want to make this a bit more explicit and make it easy for people familiar with SQL to edit that part of your code you can do the following:
+
+##### Write a SQL chunk
+One of the real delights of using RMarkdown is that it lets us write in many different languages together. Just change the `{r}` in a code chunk to `{sql connection=con, output.var="output_var_name"}` and you're good to go. This lets you write a chunk of SQl just like you would in Microsoft SQL Server Management Studio using the connection you set up as `con` and the output ends up as a data frame called `output_var_name`.
+
+\newpage
+
+```{sql connection=con, output.var="dfe_colours"}
+SELECT  DISTINCT
+[AAL_BG_Colour]
+FROM [BI].[rel].[Assessment_Achievement_Level]
+```
+
+```{sql connection=con, output.var="biggest_schools"}
+SELECT TOP 8 
+Site_ID, Site_Name, Site_Type, Longitude, Latitude, Current_Maximum_Student_Capacity 
+FROM bi.dwh.dim_site
+WHERE IsOperational = 'TRUE'
+AND Site_Type IN ('Primary Education', 'Secondary Education', 'Primary/Secondary Combined') 
+ORDER BY Current_Maximum_Student_Capacity DESC
+```
+
+And you can then access in an R code chunk:
+```{r fig.width=7, fig.height=3}
+library(tidyverse)
+
+dfe_colours <- dfe_colours %>%
+  pull(AAL_BG_Colour)
+
+biggest_schools %>%
+  ggplot(aes(Current_Maximum_Student_Capacity, 
+             reorder(Site_Name, Current_Maximum_Student_Capacity), 
+             fill = Site_Type)) + 
+  geom_col() + 
+  scale_fill_manual(values = c("Primary/Secondary Combined" = dfe_colours[2], 
+                               "Secondary Education" = dfe_colours[3])) +
+  theme_minimal() +
+  theme(legend.position = "bottom") + 
+  labs(title = "SA schools with the highest capacity", 
+       y = "", x = "", fill = "")
+```
